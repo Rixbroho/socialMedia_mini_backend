@@ -1,6 +1,7 @@
 const express=require('express');
 const app=express();
 const userModel=require('./models/user');
+const postModel=require('./models/posts')
 
 const cookiesParser=require('cookie-parser');
 const bcrypt=require('bcrypt');
@@ -12,12 +13,15 @@ app.use(express.urlencoded({extended:true}))
 app.use(cookiesParser());
 
 const isLoggedIn=(req,res,next)=>{
-    if(req.cookies.token=='') {
+    const token=req.cookies.token;
+    if(!token) return res.redirect('/login');
+
+    if(token=='') {
         return res.send('login first')
         // return res.redirect('/login')
     }
     else{
-        let data=jwt.verify(req.cookies.token,'scret');
+        let data=jwt.verify(token,'scret');
         req.user=data;
     }
     next()
@@ -36,9 +40,10 @@ app.get('/logout',(req,res)=>{
     res.redirect('/login')
 });
 
-app.get('/profile',isLoggedIn,(req,res)=>{
-    console.log(req.user);
-    res.send('dashboard');
+app.get('/profile',isLoggedIn,async (req,res)=>{
+    let user=await userModel.findOne({email: req.user.email}).populate("posts")
+    res.render('profile',{user});
+    // console.log(user)
 })
 
 app.post('/register',async (req,res)=>{
@@ -76,6 +81,19 @@ app.post('/login',async(req,res)=>{
     res.redirect('/profile')
 });
 
+app.post('/post',isLoggedIn,async(req,res)=>{
+    let user=await userModel.findOne({email: req.user.email});
+    let {content}=req.body;
+    console.log(content)
+    let newPost=await postModel.create({
+        user: user._id,
+        content
+    });
+    console.log(newPost);
+    user.posts.push(newPost._id);
+    await user.save();
+    res.redirect('/profile')
+})
 
 
 app.listen(3000);

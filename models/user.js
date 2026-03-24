@@ -8,10 +8,11 @@ const userSchema=mongoose.Schema({
     email: String,
     password : String,
     age: Number,
-    post: {
+    posts : [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'posts'
-    }
+        ref: 'posts',
+        default:[]
+    }]
 });
 
 module.exports=mongoose.model('user',userSchema);
