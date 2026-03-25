@@ -14,17 +14,20 @@ app.use(cookiesParser());
 
 const isLoggedIn=(req,res,next)=>{
     const token=req.cookies.token;
-    if(!token) return res.redirect('/login');
-
-    if(token=='') {
-        return res.send('login first')
-        // return res.redirect('/login')
+    if(!token) {
+        return res.redirect('/login');
     }
-    else{
+    // if(token=='') {
+    //     return res.send('login first')
+    //     // return res.redirect('/login')
+    // }
+    try{
         let data=jwt.verify(token,'scret');
         req.user=data;
-    }
-    next()
+        next();
+    }catch(err){
+        return res.send('login first');
+    }  
 }
 
 app.get('/',(req,res)=>{
@@ -40,8 +43,22 @@ app.get('/logout',(req,res)=>{
     res.redirect('/login')
 });
 
+app.get('/like/:id',isLoggedIn,async(req,res)=>{
+    let post=await postModel.findOne({_id: req.params.id}).populate('user');
+    // console.log(req.user)
+    if(post.likes.indexOf(req.user.userId)=== -1){
+        post.likes.push(req.user.userId);
+    }
+    else{
+        post.likes.splice(post.likes.indexOf(req.user.userId),1);
+    }
+    await post.save();
+    res.redirect('/profile')
+});
+
 app.get('/profile',isLoggedIn,async (req,res)=>{
     let user=await userModel.findOne({email: req.user.email}).populate("posts")
+    // console.log("REQ.USER:", req.user);
     res.render('profile',{user});
     // console.log(user)
 })
@@ -94,6 +111,7 @@ app.post('/post',isLoggedIn,async(req,res)=>{
     await user.save();
     res.redirect('/profile')
 })
+
 
 
 app.listen(3000);
