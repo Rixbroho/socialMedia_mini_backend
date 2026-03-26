@@ -1,127 +1,155 @@
-const express=require('express');
-const app=express();
-const userModel=require('./models/user');
-const postModel=require('./models/posts')
+const express = require("express");
+const app = express();
+const userModel = require("./models/user");
+const postModel = require("./models/posts");
 
-const cookiesParser=require('cookie-parser');
-const bcrypt=require('bcrypt');
-const jwt=require('jsonwebtoken');
+const cookiesParser = require("cookie-parser");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const multer=require("multer")
+const crypto = require("crypto");
+const path=require("path")
 
-app.set('view engine','ejs');
+app.set("view engine", "ejs");
 app.use(express.json());
-app.use(express.urlencoded({extended:true}))
+app.use(express.urlencoded({ extended: true }));
 app.use(cookiesParser());
 
-const isLoggedIn=(req,res,next)=>{
-    const token=req.cookies.token;
-    if(!token) {
-        return res.redirect('/login');
-    }
-    // if(token=='') {
-    //     return res.send('login first')
-    //     // return res.redirect('/login')
-    // }
-    try{
-        let data=jwt.verify(token,'scret');
-        req.user=data;
-        next();
-    }catch(err){
-        return res.send('login first');
-    }  
-}
-
-app.get('/',(req,res)=>{
-    res.render('index')
-});
-
-app.get('/login',(req,res)=>{
-    res.render('login')
-})
-
-app.get('/logout',(req,res)=>{
-    res.cookie('token','')
-    res.redirect('/login')
-});
-
-app.get('/like/:id',isLoggedIn,async(req,res)=>{
-    let post=await postModel.findOne({_id: req.params.id}).populate('user');
-    // console.log(req.user)
-    if(post.likes.indexOf(req.user.userId)=== -1){
-        post.likes.push(req.user.userId);
-    }
-    else{
-        post.likes.splice(post.likes.indexOf(req.user.userId),1);
-    }
-    await post.save();
-    res.redirect('/profile')
-});
-
-app.get('/edit/:id',isLoggedIn,async(req,res)=>{
-    let post=await postModel.findOne({_id: req.params.id}).populate('user');
-    res.render('edit',{post})
-});
-
-app.get('/profile',isLoggedIn,async (req,res)=>{
-    let user=await userModel.findOne({email: req.user.email}).populate("posts")
-    // console.log("REQ.USER:", req.user);
-    res.render('profile',{user});
-    // console.log(user)
-})
-
-app.post('/register',async (req,res)=>{
-    let {username,email,password,age,name}=req.body;
-    let checkUser=await userModel.findOne({email});
-    // console.log(checkUser)
-    // if(checkUser) return res.status(500).send('user exist');
-
-    const salt=await bcrypt.genSalt(10);
-    const hash=await bcrypt.hash(password,salt)
-
-    const user=await userModel.create({
-        username,
-        email,
-        password: hash,
-        age,
-        name
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "./public/images/uploads");
+  },
+  filename: function (req, file, cb) {
+    crypto.randomBytes(12, (err, bytes) => {
+    const fn=bytes.toString("hex")+path.extname(file.originalname);
+      cb(null,fn);
     });
-    let token=jwt.sign({email,userId:user._id},'scret');
-    res.cookie('token',token)
-    res.redirect('/login')
-})
-
-app.post('/login',async(req,res)=>{
-    let {email,password}=req.body;
-
-    let checkUser=await userModel.findOne({email});
-    if(!checkUser) return res.status(400).send('something went wrong');
-
-    let checkpassword=await bcrypt.compare(password,checkUser.password);
-    if(!checkpassword) return res.send('something went wrong p');
-
-    let token=jwt.sign({email,userId:checkUser._id},'scret');
-    res.cookie('token',token);
-    res.redirect('/profile')
+    
+  },
 });
 
-app.post('/post',isLoggedIn,async(req,res)=>{
-    let user=await userModel.findOne({email: req.user.email});
-    let {content}=req.body;
-    console.log(content)
-    let newPost=await postModel.create({
-        user: user._id,
-        content
-    });
-    console.log(newPost);
-    user.posts.push(newPost._id);
-    await user.save();
-    res.redirect('/profile')
-})
+const upload = multer({ storage: storage });
 
+const isLoggedIn = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.redirect("/login");
+  }
+  // if(token=='') {
+  //     return res.send('login first')
+  //     // return res.redirect('/login')
+  // }
+  try {
+    let data = jwt.verify(token, "scret");
+    req.user = data;
+    next();
+  } catch (err) {
+    return res.send("login first");
+  }
+};
 
-app.post('/update/:id',isLoggedIn,async(req,res)=>{
-    let post=await postModel.findOneAndUpdate({_id: req.params.id},{content: req.body.content});
-    res.redirect('/profile');
-})
+app.get("/", (req, res) => {
+  res.render("index");
+});
 
+app.get("/test", (req, res) => {
+  res.render("test");
+});
+
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+app.get("/logout", (req, res) => {
+  res.cookie("token", "");
+  res.redirect("/login");
+});
+
+app.get("/like/:id", isLoggedIn, async (req, res) => {
+  let post = await postModel.findOne({ _id: req.params.id }).populate("user");
+  // console.log(req.user)
+  if (post.likes.indexOf(req.user.userId) === -1) {
+    post.likes.push(req.user.userId);
+  } else {
+    post.likes.splice(post.likes.indexOf(req.user.userId), 1);
+  }
+  await post.save();
+  res.redirect("/profile");
+});
+
+app.get("/edit/:id", isLoggedIn, async (req, res) => {
+  let post = await postModel.findOne({ _id: req.params.id }).populate("user");
+  res.render("edit", { post });
+});
+
+app.get("/profile", isLoggedIn, async (req, res) => {
+  let user = await userModel
+    .findOne({ email: req.user.email })
+    .populate("posts");
+  // console.log("REQ.USER:", req.user);
+  res.render("profile", { user });
+  // console.log(user)
+});
+
+app.post("/register", async (req, res) => {
+  let { username, email, password, age, name } = req.body;
+  let checkUser = await userModel.findOne({ email });
+  // console.log(checkUser)
+  // if(checkUser) return res.status(500).send('user exist');
+
+  const salt = await bcrypt.genSalt(10);
+  const hash = await bcrypt.hash(password, salt);
+
+  const user = await userModel.create({
+    username,
+    email,
+    password: hash,
+    age,
+    name,
+  });
+  let token = jwt.sign({ email, userId: user._id }, "scret");
+  res.cookie("token", token);
+  res.redirect("/login");
+});
+
+app.post("/login", async (req, res) => {
+  let { email, password } = req.body;
+
+  let checkUser = await userModel.findOne({ email });
+  if (!checkUser) return res.status(400).send("something went wrong");
+
+  let checkpassword = await bcrypt.compare(password, checkUser.password);
+  if (!checkpassword) return res.send("something went wrong p");
+
+  let token = jwt.sign({ email, userId: checkUser._id }, "scret");
+  res.cookie("token", token);
+  res.redirect("/profile");
+});
+
+app.post("/post", isLoggedIn, async (req, res) => {
+  let user = await userModel.findOne({ email: req.user.email });
+  let { content } = req.body;
+  console.log(content);
+  let newPost = await postModel.create({
+    user: user._id,
+    content,
+  });
+  console.log(newPost);
+  user.posts.push(newPost._id);
+  await user.save();
+  res.redirect("/profile");
+});
+
+app.post("/update/:id", isLoggedIn, async (req, res) => {
+  let post = await postModel.findOneAndUpdate(
+    { _id: req.params.id },
+    { content: req.body.content },
+  );
+  res.redirect("/profile");
+});
+
+app.post("/image",upload.single('image'), async (req, res) => {
+  console.log(req.body);
+});
 
 app.listen(3000);
