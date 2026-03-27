@@ -5,30 +5,16 @@ const postModel = require("./models/posts");
 
 const cookiesParser = require("cookie-parser");
 const bcrypt = require("bcrypt");
+const path=require('path');
 const jwt = require("jsonwebtoken");
-const multer=require("multer")
-const crypto = require("crypto");
-const path=require("path")
+
+const multerConfig=require('./config/multerConfig')
 
 app.set("view engine", "ejs");
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookiesParser());
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./public/images/uploads");
-  },
-  filename: function (req, file, cb) {
-    crypto.randomBytes(12, (err, bytes) => {
-    const fn=bytes.toString("hex")+path.extname(file.originalname);
-      cb(null,fn);
-    });
-    
-  },
-});
-
-const upload = multer({ storage: storage });
+app.use(express.static(path.join(__dirname,"public")));
 
 const isLoggedIn = (req, res, next) => {
   const token = req.cookies.token;
@@ -52,9 +38,6 @@ app.get("/", (req, res) => {
   res.render("index");
 });
 
-app.get("/test", (req, res) => {
-  res.render("test");
-});
 
 app.get("/login", (req, res) => {
   res.render("login");
@@ -88,6 +71,14 @@ app.get("/profile", isLoggedIn, async (req, res) => {
     .populate("posts");
   // console.log("REQ.USER:", req.user);
   res.render("profile", { user });
+  // console.log(user)
+});
+
+app.get("/profile/upload", isLoggedIn, async (req, res) => {
+  let user = await userModel
+    .findOne({ email: req.user.email });
+  // console.log("REQ.USER:", req.user);
+  res.render("profileupload", { user });
   // console.log(user)
 });
 
@@ -148,8 +139,14 @@ app.post("/update/:id", isLoggedIn, async (req, res) => {
   res.redirect("/profile");
 });
 
-app.post("/image",upload.single('image'), async (req, res) => {
-  console.log(req.body);
+app.post('/upload',isLoggedIn, multerConfig.single('image'), async function (req, res) {
+  let user=await userModel.findOne({email:req.user.email});
+  // console.log(user)
+  user.profilepic=req.file.filename;
+  await user.save();
+  res.redirect('/profile')
 });
+
+
 
 app.listen(3000);
