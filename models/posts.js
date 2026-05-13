@@ -19,4 +19,5 @@ const postSchema = mongodb.Schema({
   },
 });
 
+
 module.exports = mongodb.model("posts", postSchema);
